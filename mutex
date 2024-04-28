@@ -1,0 +1,112 @@
+#include &quot;includes.h&quot;
+#include &quot;edutech.h&quot;
+#include &quot;uart.h&quot;
+#include &quot;lcd.h&quot;
+#define UART_DEBUG 0
+#if UART_DEBUG
+OS_STK UartDebugStack[100];
+/* UART Debug Task */
+void UART_Debug(void *pdata)
+{
+OS_STK_DATA data;
+Uart0_Init(9600);
+while(1)
+{
+OSTaskStkChk(7, &amp;data); // Provide the priority of task here
+uprintf(&quot;\x1b[1;1HTask1 %d04 %d04 %d04&quot;,data.OSFree+data.OSUsed,
+
+data.OSFree, data.OSUsed);
+
+OSTimeDlyHMSM(0, 0, 0, 500);
+}
+}
+#endif
+OS_EVENT *guardian;
+OS_STK Task1Stack[100];
+void Task1(void *pdata);
+OS_STK Task2Stack[100];
+void Task2(void *pdata);
+OS_STK Task3Stack[100];
+void Task3(void *pdata);
+
+/* Main Program */
+int main (void)
+{
+INT8U return_code;
+timer_init();
+OSInit();
+
+#if UART_DEBUG
+OSTaskCreateExt(UART_Debug,(void
+*)0,&amp;UartDebugStack[99],7,0,&amp;UartDebugStack[0],100,(void *)0,OS_TASK_OPT_STK_CHK |
+OS_TASK_OPT_STK_CLR);
+#endif
+guardian = OSMutexCreate(1, &amp;return_code);
+OSTaskCreate(Task1, (void *)0, &amp;Task1Stack[99], 2);
+OSTaskCreate(Task2, (void *)0, &amp;Task2Stack[99], 3);
+OSTaskCreate(Task3, (void *)0, &amp;Task3Stack[99], 4);
+OSStart();
+return 0;
+}
+
+/* Task Definition */
+/**
+* Task1 to Print A to Z on LCD line1
+*/
+void Task1(void *pdata)
+{
+INT8U return_code;
+Uart0_Init(9600);
+while(1)
+{
+OSMutexPend(guardian, 500, &amp;return_code);
+if (return_code == OS_NO_ERR)
+{
+uprintf(&quot;\n\rTask1 Executed&quot;);
+OSMutexPost(guardian);
+}
+OSTimeDlyHMSM(0, 0, 0, 500);
+}
+}
+
+/**
+* Task2 to Print 0 to 9 on LCD line2
+*/
+void Task2(void *pdata)
+
+{
+INT8U return_code;
+Uart0_Init(9600);
+while(1)
+{
+OSMutexPend(guardian, 500, &amp;return_code);
+if (return_code == OS_NO_ERR)
+{
+uprintf(&quot;\n\rTask2 Executed&quot;);
+OSMutexPost(guardian);
+}
+OSTimeDlyHMSM(0, 0, 0, 500);
+}
+}
+
+void Task3(void *pdata)
+{
+INT8U return_code;
+int i=0;
+Lcd_Init(); // Initialize LCD in 8bit mode
+Lcd_Cmd(0x01); // LCD clear cmd
+Lcd_Cmd(0x80); // LCD Line1 cmd
+Lcd_String(&quot;T3 &quot;);
+while(1)
+{
+OSMutexPend(guardian, 500, &amp;return_code);
+if (return_code == OS_NO_ERR)
+{
+Lcd_Cmd(0x83); // LCD Line1 cmd
+Lcd_Data(0x41 + i++);
+if(i==26) i=0;
+OSMutexPost(guardian);
+}
+OSTimeDlyHMSM(0, 0, 0, 500);
+}
+}
