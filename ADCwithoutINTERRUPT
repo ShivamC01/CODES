@@ -1,0 +1,109 @@
+#include &quot;lpc214x.h&quot;
+//#define LCD (0xff&lt;&lt;8)
+#define RS (1&lt;&lt;5)
+#define RW (1&lt;&lt;6)
+#define EN (1&lt;&lt;7)
+void delay_fv(unsigned int x,int y);
+void lcd_display(unsigned int x);
+void cmd (unsigned int x);
+void lcd_ini(void);
+void lcd_str(unsigned char *x);
+void DisplayHexLcd(int LcdData);
+unsigned int AdcData =0;
+
+int main()
+{
+PINSEL0=0X00000000;
+IODIR0=0XFFFFFFFF;
+VPBDIV = 1;
+lcd_ini();
+// Config ADC
+PINSEL1= 0x01000000; //AD0.1 ; Bit No. 25 and 24 of PINSEL1
+should be 0 and 1 resp.
+AD0CR = 0x01200302; //AD0.1
+ADGSR = 0x01000000;
+cmd (0x80);
+lcd_str (&quot;VAL HEX:&quot;);
+cmd (0xC0);
+lcd_str (&quot;CH1:&quot;);
+{
+AD0CR = AD0CR | (1&lt;&lt;24); /* Start Conversion */
+delay_fv(100,10);
+
+while((AD0GDR &amp; 0x80000000)!=0x80000000); /* Wait till DONE */
+AdcData = (AD0GDR &amp; 0x0000FFC0)&gt;&gt;6;
+//voltage= ((AdcData/1023)*3.3);
+DisplayHexLcd(AdcData);
+
+cmd (0xC8);
+
+lcd_display (&quot;H&quot;);
+}
+while(1);
+}
+void delay_fv(unsigned int x,int y)
+{
+unsigned int i,j;
+for(i=0;i&lt;x;i++)
+for(j=0;j&lt;y;j++);
+}
+void lcd_display(unsigned int x) //at bit 0 to 7;x= 0x41 = 01000001
+{
+IOCLR0 = 0x0000FF00; //bits 8 to 18 as 00000000
+x =(x&lt;&lt;8); //at bit 8 to 15;x= 0x41 = 01000001
+IOSET0 = x; // bits 8 to 18 as 01000001
+IOSET0 =RS; //RS=1 for data
+IOCLR0 =RW; //RW =0
+IOSET0 =EN; //high to low pulse on enable line
+delay_fv(100,10);
+IOCLR0 =EN;
+}
+void cmd (unsigned int x)
+{
+IOCLR0 = 0x0000FF00;
+x =(x&lt;&lt;8);
+IOSET0 = x;
+IOCLR0 =RS;
+IOCLR0 =RW;
+IOSET0 =EN;
+delay_fv(100,10);
+IOCLR0 =EN;
+}
+void lcd_ini(void)
+{
+cmd(0X38);
+cmd(0X0e);
+cmd(0X01);
+cmd(0X06);
+
+}
+void lcd_str(unsigned char x[])
+{
+int i;
+for(i=0;x[i]!=&#39;\0&#39;;i++)
+{
+lcd_display(x[i]);
+}
+}
+void DisplayHexLcd(int LcdData) //000H to 3FFH //0x123
+{
+unsigned char Character[17]={&quot;0123456789ABCDEF&quot;};
+unsigned int DivValue=0x100,BaseValue=0x10;
+char j = 0;
+while(DivValue)
+{
+
+cmd(0xc6+j++);
+
+lcd_display(Character[LcdData/DivValue]); // 3ff //1 //2
+LcdData%=DivValue;
+
+//23 //3
+
+DivValue/=BaseValue;
+
+//10 //1
+
+}
+
+}
